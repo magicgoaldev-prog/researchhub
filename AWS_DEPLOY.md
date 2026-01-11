@@ -16,11 +16,16 @@ sudo apt-get install -y nginx
 git clone <your-repo-url>
 cd reserchhub---participant-management-system
 npm install
+# devDependencies 포함하여 설치
+npm install
+# 또는 명시적으로 dev dependencies 설치
+npm install --include=dev
 npm run build
 
 # 5. PM2로 서버 실행
 sudo npm install -g pm2
-pm2 start server.js --name "research-hub"
+# pm2 start server.js --name "research-hub"
+NODE_ENV=production PORT=3000 pm2 start server.js --name research-hub
 pm2 startup
 pm2 save
 
