@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Study, StudyStatus, StudyType } from '../types';
+import { userService } from '../services/userService';
 
 interface ResearcherDashboardProps {
   user: User;
@@ -13,14 +14,26 @@ interface ResearcherDashboardProps {
 const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({ user, studies, setStudies, t, activeTab }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [researchers, setResearchers] = useState<User[]>([]);
   const [newStudy, setNewStudy] = useState({
     title: '',
     description: '',
     type: StudyType.IN_PERSON,
     rewardPoints: 1,
     duration: 30,
-    location: ''
+    location: '',
+    collaborators: [] as string[]
   });
+
+  useEffect(() => {
+    loadResearchers();
+  }, []);
+
+  const loadResearchers = async () => {
+    const users = await userService.getUsers();
+    const researcherUsers = users.filter(u => u.role === 'RESEARCHER' && u.id !== user.id);
+    setResearchers(researcherUsers);
+  };
 
   const myStudies = studies.filter(s => s.researcherId === user.id);
 
@@ -34,7 +47,8 @@ const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({ user, studies
         type: newStudy.type,
         rewardPoints: newStudy.rewardPoints,
         durationMinutes: newStudy.duration,
-        location: newStudy.location
+        location: newStudy.location,
+        collaborators: newStudy.collaborators
       } : s));
     } else {
       const createdStudy: Study = {
@@ -48,8 +62,9 @@ const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({ user, studies
         rewardPoints: newStudy.rewardPoints,
         durationMinutes: newStudy.duration,
         location: newStudy.location,
-        slots: []
-      };
+        slots: [],
+        collaborators: newStudy.collaborators
+      } as Study & { collaborators: string[] };
       setStudies([...studies, createdStudy]);
     }
     closeModal();
@@ -63,7 +78,8 @@ const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({ user, studies
       type: study.type,
       rewardPoints: study.rewardPoints,
       duration: study.durationMinutes,
-      location: study.location || ''
+      location: study.location || '',
+      collaborators: (study as any).collaborators || []
     });
     setShowCreateModal(true);
   };
@@ -71,7 +87,17 @@ const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({ user, studies
   const closeModal = () => {
     setShowCreateModal(false);
     setEditingId(null);
-    setNewStudy({ title: '', description: '', type: StudyType.IN_PERSON, rewardPoints: 1, duration: 30, location: '' });
+    setNewStudy({ title: '', description: '', type: StudyType.IN_PERSON, rewardPoints: 1, duration: 30, location: '', collaborators: [] });
+  };
+
+  const addCollaborator = (researcherId: string) => {
+    if (!newStudy.collaborators.includes(researcherId)) {
+      setNewStudy({...newStudy, collaborators: [...newStudy.collaborators, researcherId]});
+    }
+  };
+
+  const removeCollaborator = (researcherId: string) => {
+    setNewStudy({...newStudy, collaborators: newStudy.collaborators.filter(id => id !== researcherId)});
   };
 
   const exportCsv = () => {
@@ -300,6 +326,63 @@ const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({ user, studies
                         />
                      </div>
                    )}
+
+                   {/* Collaborators Section */}
+                   <div className="space-y-3">
+                      <label className="text-sm font-bold text-slate-700">공동 연구자</label>
+                      
+                      {/* Selected Collaborators */}
+                      {newStudy.collaborators.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-slate-500">선택된 공동 연구자:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {newStudy.collaborators.map(id => {
+                              const researcher = researchers.find(r => r.id === id);
+                              return researcher ? (
+                                <div key={id} className="flex items-center bg-red-50 text-red-700 px-3 py-1 rounded-full text-sm">
+                                  <span>{researcher.name}</span>
+                                  <button 
+                                    type="button"
+                                    onClick={() => removeCollaborator(id)}
+                                    className="ml-2 text-red-500 hover:text-red-700"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ) : null;
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Available Researchers */}
+                      <div className="max-h-32 overflow-y-auto border border-slate-200 rounded-xl">
+                        {researchers.length === 0 ? (
+                          <p className="p-4 text-center text-slate-400 text-sm">다른 연구자가 없습니다.</p>
+                        ) : (
+                          researchers.map(researcher => (
+                            <div key={researcher.id} className="flex items-center justify-between p-3 hover:bg-slate-50 border-b border-slate-100 last:border-b-0">
+                              <div>
+                                <p className="font-medium text-slate-700">{researcher.name}</p>
+                                <p className="text-xs text-slate-500">{researcher.email}</p>
+                              </div>
+                              <button 
+                                type="button"
+                                onClick={() => addCollaborator(researcher.id)}
+                                disabled={newStudy.collaborators.includes(researcher.id)}
+                                className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
+                                  newStudy.collaborators.includes(researcher.id)
+                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                              >
+                                {newStudy.collaborators.includes(researcher.id) ? '추가됨' : '추가'}
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                   </div>
 
                    <div className="pt-6">
                       <button type="submit" className="w-full py-3 bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl shadow-lg transition-all">

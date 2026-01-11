@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Study, StudyStatus, UserRole } from '../types';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { MOCK_USER_PARTICIPANT, MOCK_USER_RESEARCHER } from '../constants';
+import { userService } from '../services/userService';
 
 interface AdminDashboardProps {
   user: User;
@@ -25,15 +25,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ studies, setStudies, t,
   const [viewMode, setViewMode] = useState<'stats' | 'users'>('stats');
   const [selectedReviewStudy, setSelectedReviewStudy] = useState<Study | null>(null);
   const [showAllPending, setShowAllPending] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    const allUsers = await userService.getUsers();
+    setUsers(allUsers);
+  };
 
   const pendingStudies = studies.filter(s => s.status === StudyStatus.PENDING);
-  const users: User[] = [
-    MOCK_USER_PARTICIPANT, 
-    MOCK_USER_RESEARCHER, 
-    { id: 'u3', name: '이영희', email: 'yh.lee@khu.ac.kr', role: UserRole.PARTICIPANT },
-    { id: 'u4', name: '장동건', email: 'dg.jang@khu.ac.kr', role: UserRole.RESEARCHER },
-    { id: 'u5', name: '전지현', email: 'jh.jeon@khu.ac.kr', role: UserRole.PARTICIPANT }
-  ];
 
   const handleApprove = (id: string) => {
     setStudies(studies.map(s => s.id === id ? { ...s, status: StudyStatus.ACTIVE } : s));

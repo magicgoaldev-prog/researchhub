@@ -14,6 +14,7 @@ import {
   MOCK_STUDIES 
 } from './constants';
 import { Language, translations } from './translations';
+import { userService } from './services/userService';
 import Navbar from './components/Navbar';
 import ParticipantDashboard from './views/ParticipantDashboard';
 import ResearcherDashboard from './views/ResearcherDashboard';
@@ -27,17 +28,42 @@ const App: React.FC = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [lang, setLang] = useState<Language>('ko');
+  const [isLoading, setIsLoading] = useState(true);
 
   const t = (key: keyof typeof translations.ko) => {
     return translations[lang][key] || translations.ko[key];
   };
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('rh_user');
-    const savedLang = localStorage.getItem('rh_lang') as Language;
-    if (savedUser) setCurrentUser(JSON.parse(savedUser));
-    if (savedLang) setLang(savedLang);
+    initializeApp();
   }, []);
+
+  const initializeApp = async () => {
+    const savedUserId = localStorage.getItem('rh_user_id');
+    const savedLang = localStorage.getItem('rh_lang') as Language;
+    
+    if (savedUserId) {
+      await loadUserById(savedUserId);
+    }
+    if (savedLang) setLang(savedLang);
+    
+    setIsLoading(false);
+  };
+
+  const loadUserById = async (userId: string) => {
+    try {
+      const users = await userService.getUsers();
+      const user = users.find(u => u.id === userId);
+      if (user) {
+        setCurrentUser(user);
+      } else {
+        localStorage.removeItem('rh_user_id');
+      }
+    } catch (error) {
+      console.error('Failed to load user:', error);
+      localStorage.removeItem('rh_user_id');
+    }
+  };
 
   const handleLanguageChange = (newLang: Language) => {
     setLang(newLang);
@@ -47,7 +73,7 @@ const App: React.FC = () => {
   const handleLogin = (role: UserRole, user?: User) => {
     if (user) {
       setCurrentUser(user);
-      localStorage.setItem('rh_user', JSON.stringify(user));
+      localStorage.setItem('rh_user_id', user.id);
     } else {
       let defaultUser: User;
       switch(role) {
@@ -56,15 +82,26 @@ const App: React.FC = () => {
         default: defaultUser = MOCK_USER_PARTICIPANT;
       }
       setCurrentUser(defaultUser);
-      localStorage.setItem('rh_user', JSON.stringify(defaultUser));
+      localStorage.setItem('rh_user_id', defaultUser.id);
     }
     setActiveTab('dashboard');
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('rh_user');
+    localStorage.removeItem('rh_user_id');
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block bg-red-700 text-white p-4 rounded-2xl font-bold text-3xl mb-4 shadow-lg ring-4 ring-red-50">KHU</div>
+          <p className="text-slate-500">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return <LoginView onLogin={handleLogin} t={t} lang={lang} onLangChange={handleLanguageChange} />;

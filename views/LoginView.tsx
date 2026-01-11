@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { UserRole, User } from '../types';
 import { Language } from '../translations';
+import { userService } from '../services/userService';
 
 interface LoginViewProps {
   onLogin: (role: UserRole, user?: User) => void;
@@ -17,6 +18,11 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, t, lang, onLangChange })
   // Form States
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [usernameChecked, setUsernameChecked] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [sentCode, setSentCode] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     birthdate: '',
@@ -27,42 +33,77 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, t, lang, onLangChange })
     position: '',
   });
 
-  const handleAuth = (e: React.FormEvent) => {
+  const checkUsername = async () => {
+    if (!username) {
+      alert('아이디를 입력해주세요.');
+      return;
+    }
+    
+    const exists = await userService.usernameExists(username);
+    if (exists) {
+      alert('이미 사용중인 아이디입니다.');
+      setUsernameChecked(false);
+    } else {
+      alert('사용 가능한 아이디입니다.');
+      setUsernameChecked(true);
+    }
+  };
+
+  const sendEmailVerification = () => {
+    if (!formData.email) {
+      alert('이메일을 입력해주세요.');
+      return;
+    }
+    
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setSentCode(code);
+    alert(`인증코드가 발송되었습니다: ${code}`);
+  };
+
+  const verifyEmail = () => {
+    if (verificationCode === sentCode) {
+      setEmailVerified(true);
+      alert('이메일 인증이 완료되었습니다.');
+    } else {
+      alert('인증코드가 일치하지 않습니다.');
+    }
+  };
+
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (isLoginMode) {
-      // Admin Check
-      if (username === 'Han_kim' && password === '2025yein') {
-        onLogin(UserRole.ADMIN, {
-          id: 'admin-001',
-          name: 'Han Kim (Admin)',
-          email: 'admin@khu.ac.kr',
-          role: UserRole.ADMIN,
-          username: 'Han_kim'
-        });
+      // Check against mock users database
+      const foundUser = await userService.findUser(username, password);
+      if (foundUser) {
+        onLogin(foundUser.role as UserRole, foundUser);
+      } else {
+        alert('아이디 또는 비밀번호가 올바르지 않습니다.');
+      }
+    } else {
+      // Registration Flow - Validation
+      if (password !== confirmPassword) {
+        alert('비밀번호가 일치하지 않습니다.');
+        return;
+      }
+      
+      if (!usernameChecked) {
+        alert('아이디 중복확인을 해주세요.');
+        return;
+      }
+      
+      if (!emailVerified) {
+        alert('이메일 인증을 완료해주세요.');
         return;
       }
 
-      // Simple mock login for other roles
-      if (username && password) {
-        onLogin(role, {
-          id: `mock-${Date.now()}`,
-          name: username,
-          email: `${username}@khu.ac.kr`,
-          role: role,
-          username: username
-        });
-      } else {
-        alert('아이디와 비밀번호를 입력해주세요.');
-      }
-    } else {
-      // Registration Flow
-      const mockUser: User = {
+      const newUser: User & { password: string } = {
         id: `user-${Date.now()}`,
         name: formData.name,
         email: formData.email,
         role: role,
         username: username,
+        password: password,
         metadata: {
           birthdate: formData.birthdate,
           phone: formData.phone,
@@ -73,8 +114,12 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, t, lang, onLangChange })
         }
       };
       
-      onLogin(role, mockUser);
-      alert(`${formData.name}님, 경희대학교 연구 참여 시스템 가입을 환영합니다!`);
+      if (await userService.addUser(newUser)) {
+        onLogin(role, newUser);
+        alert(`${formData.name}님, 경희대학교 연구 참여 시스템 가입을 환영합니다!`);
+      } else {
+        alert('회원가입에 실패했습니다.');
+      }
     }
   };
 
@@ -177,13 +222,45 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, t, lang, onLangChange })
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-600 ml-1">이메일 주소</label>
-                  <input 
-                    required
-                    type="email"
-                    className="w-full px-4 py-3 bg-slate-50 border-transparent border-2 focus:border-red-700 rounded-xl outline-none transition-all text-sm"
-                    value={formData.email}
-                    onChange={e => setFormData({...formData, email: e.target.value})}
-                  />
+                  <div className="flex gap-2">
+                    <input 
+                      required
+                      type="email"
+                      className="flex-1 px-4 py-3 bg-slate-50 border-transparent border-2 focus:border-red-700 rounded-xl outline-none transition-all text-sm"
+                      value={formData.email}
+                      onChange={e => {
+                        setFormData({...formData, email: e.target.value});
+                        setEmailVerified(false);
+                      }}
+                    />
+                    <button 
+                      type="button"
+                      onClick={sendEmailVerification}
+                      className="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      인증발송
+                    </button>
+                  </div>
+                  {sentCode && (
+                    <div className="flex gap-2 mt-2">
+                      <input 
+                        type="text"
+                        placeholder="인증코드 6자리"
+                        className="flex-1 px-4 py-2 bg-slate-50 border-transparent border-2 focus:border-red-700 rounded-xl outline-none transition-all text-sm"
+                        value={verificationCode}
+                        onChange={e => setVerificationCode(e.target.value)}
+                      />
+                      <button 
+                        type="button"
+                        onClick={verifyEmail}
+                        className={`px-3 py-2 text-xs rounded-lg transition-colors ${
+                          emailVerified ? 'bg-green-600 text-white' : 'bg-gray-600 text-white hover:bg-gray-700'
+                        }`}
+                      >
+                        {emailVerified ? '인증완료' : '인증확인'}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {role === UserRole.PARTICIPANT ? (
@@ -227,13 +304,29 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, t, lang, onLangChange })
 
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-600 ml-1">아이디</label>
-              <input 
-                required
-                type="text"
-                className="w-full px-4 py-3 bg-slate-50 border-transparent border-2 focus:border-red-700 rounded-xl outline-none transition-all text-sm"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <input 
+                  required
+                  type="text"
+                  className="flex-1 px-4 py-3 bg-slate-50 border-transparent border-2 focus:border-red-700 rounded-xl outline-none transition-all text-sm"
+                  value={username}
+                  onChange={e => {
+                    setUsername(e.target.value);
+                    setUsernameChecked(false);
+                  }}
+                />
+                {!isLoginMode && (
+                  <button 
+                    type="button"
+                    onClick={checkUsername}
+                    className={`px-3 py-2 text-xs rounded-lg transition-colors ${
+                      usernameChecked ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    {usernameChecked ? '확인완료' : '중복확인'}
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -246,6 +339,26 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, t, lang, onLangChange })
                 onChange={e => setPassword(e.target.value)}
               />
             </div>
+
+            {!isLoginMode && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600 ml-1">비밀번호 확인</label>
+                <input 
+                  required
+                  type="password"
+                  className={`w-full px-4 py-3 bg-slate-50 border-transparent border-2 rounded-xl outline-none transition-all text-sm ${
+                    password && confirmPassword && password !== confirmPassword 
+                      ? 'border-red-500 focus:border-red-500' 
+                      : 'focus:border-red-700'
+                  }`}
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                />
+                {password && confirmPassword && password !== confirmPassword && (
+                  <p className="text-red-500 text-xs ml-1">비밀번호가 일치하지 않습니다.</p>
+                )}
+              </div>
+            )}
 
             <button 
               type="submit"

@@ -1,0 +1,54 @@
+[
+  {
+    "id": "p1",
+    "name": "김경희",
+    "email": "khu_student@khu.ac.kr",
+    "role": "PARTICIPANT",
+    "username": "khu_student",
+    "password": "1234",
+    "metadata": {
+      "major": "심리학과 (Department of Psychology)",
+      "age": 21,
+      "gender": "Female",
+      "points": 12
+    }
+  },
+  {
+    "id": "r1",
+    "name": "이희도 교수",
+    "email": "hd.lee@khu.ac.kr",
+    "role": "RESEARCHER",
+    "username": "hd_lee",
+    "password": "1234"
+  },
+  {
+    "id": "a1",
+    "name": "KHU 관리자",
+    "email": "admin@khu.ac.kr",
+    "role": "ADMIN",
+    "username": "Han_kim",
+    "password": "2025yein"
+  },
+  {
+    "id": "user-1768122142122",
+    "name": "박동건",
+    "email": "pdg@gmail.com",
+    "role": "RESEARCHER",
+    "username": "pdguser",
+    "password": "1q1q1q",
+    "metadata": {
+      "birthdate": "1998-01-13",
+      "phone": "01065432178",
+      "employeeId": "234",
+      "position": "교수"
+    }
+  },
+  {
+    "id": "r3",
+    "name": "이민수 교수",
+    "email": "ms.lee@khu.ac.kr",
+    "role": "RESEARCHER",
+    "username": "ms_lee",
+    "password": "1234"
+  }
+]
